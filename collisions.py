@@ -1,43 +1,62 @@
 import pygame
 import random
 
-#TODO Make the black block move randomly - DONE
-#TODO Replace the rectangles with  pictures - DONE
-#TODO Make the space ship shoot
-#TODO Split the player from blocks and make a new class - DONE
-#TODO Make a Bullet class
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 
+game_over = False
+
 class Block(pygame.sprite.Sprite):
     def __init__(self, fName, width, height):
         super().__init__()
         self.image = pygame.Surface([width, height])
-        self.image = pygame.image.load(fName)
+        big_image = pygame.image.load(fName)
+        big_image.set_colorkey(WHITE)
+        self.image = pygame.transform.scale(big_image, (width, height))
+        self.mask = pygame.mask.from_surface(self.image)
         self.rect = self.image.get_rect()
-        self.x_vel = random.randrange(-2, 2)
-        self.y_vel = random.randrange(-2, 2)
+        self.xVel = random.randrange(-2, 2)
+        self.yVel = random.randrange(-2, 2)
+
+    def change_x(self):
+        self.xVel = self.xVel * -1
+
+    def change_y(self):
+        self.yVel = self.yVel * -1
 
     def update(self):
-        self.rect.x += self.x_vel
-        self.rect.y += self.y_vel
+        self.rect.x += self.xVel
+        self.rect.y += self.yVel
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, fName):
+    def __init__(self, fName, width, height):
         super().__init__()
         self.image = pygame.Surface([25, 25])
-        self.image = pygame.image.load(fName)
+        big_ss = pygame.image.load(fName)
+        big_ss.set_colorkey(WHITE)
+        self.image = pygame.transform.scale(big_ss, (width, height))
+        self.mask = pygame.mask.from_surface(self.image)
         self.rect = self.image.get_rect()
-    def moveBlock(self):
+        self.rect.x = 350
+        self.rect.y = 350
+        self.is_alive = True
+
+    def update(self):
         pass
+
+    def isDead(self):
+        self.kill()
+        self.is_alive = False
+        global game_over 
+        game_over = True
 
 class Bullet(pygame.sprite.Sprite):
     def __init__(self):
         super().__init__()
         self.image = pygame.Surface([4, 10])
-        self.image.fill(BLACK)
+        self.image.fill(RED)
         self.rect = self.image.get_rect()
     def update(self):
     # Move the bullet
@@ -45,6 +64,11 @@ class Bullet(pygame.sprite.Sprite):
 
 
 pygame.init()
+score  = 0
+font = pygame.font.Font('freesansbold.ttf', 32)
+text = font.render("Score: " + str(score), True, RED, BLACK)
+textRect = text.get_rect()
+textRect.center = (100, 20) 
 
 screen_width = 700
 screen_height = 400
@@ -55,19 +79,19 @@ all_sprites_list = pygame.sprite.Group()
 bullet_list = pygame.sprite.Group()
 
 for i in range(50):
-    block = Block("rock2.png", 20, 15)
+    block = Block("asteroid.png", 40, 40)
     block.rect.x = random.randrange(screen_width)
-    block.rect.y = random.randrange(screen_height)
+    block.rect.y = random.randrange(screen_height - 200)
     block_list.add(block)
     all_sprites_list.add(block)
 
-player = Player("spaceship.png")
+player = Player("spaceshipC.png", 30, 40)
 all_sprites_list.add(player)
 
 done = False
 clock = pygame.time.Clock()
 
-score = 0
+
 
 while not done:
     for event in pygame.event.get():
@@ -77,29 +101,46 @@ while not done:
             # Fire a bullet if the user clicks the mouse button
             bullet = Bullet()
             # Set the bullet so it is where the player is
-            bullet.rect.x = player.rect.x + 40
+            bullet.rect.x = player.rect.x + 15
             bullet.rect.y = player.rect.y
             # Add the bullet to the lists
             all_sprites_list.add(bullet)
             bullet_list.add(bullet)
-    
-    screen.fill(WHITE)
-    pos = pygame.mouse.get_pos()
-    player.rect.x = pos[0]
-    player.rect.y = pos[1]
+    if not game_over:
+        screen.fill(BLACK)
+        pos = pygame.mouse.get_pos()
+        player.rect.x = pos[0]
+        
+        all_sprites_list.update()
 
-    for block in all_sprites_list:
-        block.update()
-
-    for bullet in bullet_list:
-        blocks_hit_list = pygame.sprite.spritecollide(bullet, block_list, True)
-        for block in blocks_hit_list:
-            bullet_list.remove(bullet)
-            all_sprites_list.remove(bullet)
-            score += 1
-            print(score)
-    
-    all_sprites_list.draw(screen)
+        for bullet in bullet_list:
+            blocks_hit_list = pygame.sprite.spritecollide(bullet, block_list, True)
+            for block in blocks_hit_list:
+                bullet_list.remove(bullet)
+                all_sprites_list.remove(bullet)
+                score += 1
+                print(score)
+            if bullet.rect.y < -10:
+                bullet_list.remove(bullet)
+                all_sprites_list.remove(bullet)
+        
+        for block in block_list:
+                if pygame.sprite.collide_mask(block, player):
+                    player.isDead()
+                if block.rect.y > screen_height:
+                    block.change_y()
+                if block.rect.y < 0:
+                    block.change_y()
+                if block.rect.x > screen_width:
+                    block.rect.x = 0
+                if block.rect.x < 0:
+                    block.rect.x = screen_width
+        
+        all_sprites_list.draw(screen)
+        text = font.render("Score: " + str(score), True, RED, BLACK)
+        screen.blit(text, textRect)
+    else:
+        screen.fill(RED)
     pygame.display.flip()
     clock.tick(60)
 
